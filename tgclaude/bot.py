@@ -24,6 +24,11 @@ log = logging.getLogger("tgclaude")
 PROGRESS_EDIT_INTERVAL_S = 3.0
 
 
+def _is_authorized(from_user, allowed_user_id: int) -> bool:
+    """Пропускаем только владельца. from_user=None (канал/анонимный админ) → отказ (fail-closed)."""
+    return from_user is not None and from_user.id == allowed_user_id
+
+
 def _approval_keyboard(key: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -90,9 +95,10 @@ async def main() -> None:
     def thread_of(message: Message) -> int:
         return message.message_thread_id or 0
 
-    @dp.message(F.from_user.id != config.allowed_user_id)
+    @dp.message(lambda event: not _is_authorized(event.from_user, config.allowed_user_id))
     async def reject_strangers(message: Message) -> None:
-        log.warning("dropped message from user_id=%s", message.from_user.id)
+        uid = message.from_user.id if message.from_user else None
+        log.warning("dropped message from user_id=%s", uid)
 
     @dp.message(Command("new"))
     async def cmd_new(message: Message) -> None:
@@ -137,7 +143,10 @@ async def main() -> None:
 
     @dp.callback_query(F.data.startswith(("ok:", "no:")))
     async def on_approval(query: CallbackQuery) -> None:
-        if query.from_user.id != config.allowed_user_id:
+        if not _is_authorized(query.from_user, config.allowed_user_id):
+            return
+        if query.message is None:
+            await query.answer()
             return
         verdict, _, key = query.data.partition(":")
         thread_id = query.message.message_thread_id or 0
