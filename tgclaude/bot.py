@@ -1,6 +1,8 @@
 import asyncio
+import html
 import logging
 import time
+import uuid
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
@@ -15,9 +17,10 @@ from aiogram.types import (
 from tgclaude.approvals import ApprovalBroker, make_permission_callback
 from tgclaude.config import load_config
 from tgclaude.render import chunks, progress_text, to_html
-from tgclaude.rules import load_rules
+from tgclaude.rules import Decision, decide, describe, load_rules
 from tgclaude.runner import DoneEvent, Runner, TextEvent, ToolEvent
 from tgclaude.sessions import SessionManager
+from tgclaude.shell import run_shell
 from tgclaude.store import Store
 
 log = logging.getLogger("tgclaude")
@@ -155,6 +158,56 @@ async def main() -> None:
             broker.resolve(key, verdict == "ok")
         await query.answer("Разрешено" if verdict == "ok" else "Запрещено")
         await query.message.edit_reply_markup(reply_markup=None)
+
+    # Регистрируется ДО on_prompt: иначе "!ls" ушло бы агенту как задача.
+    @dp.message(F.text.startswith("!"))
+    async def on_direct_shell(message: Message) -> None:
+        """`!cmd` — выполнить команду напрямую, минуя агента.
+
+        Агента минуем, гейт прав — нет: те же deny → whitelist → кнопки.
+        Иначе "!" стал бы обходом всей модели безопасности.
+        """
+        thread_id = thread_of(message)
+        command = message.text[1:].strip()
+        if not command:
+            await message.reply("Пустая команда. Пример: <code>!git status</code>", parse_mode="HTML")
+            return
+        if sessions.is_busy(thread_id):
+            await message.reply("Уже занят. /stop — прервать.")
+            return
+
+        row = store.ensure(thread_id, str(config.default_cwd))
+        sessions.get_or_create(thread_id)  # гарантирует брокер для этого топика
+        decision = decide("Bash", {"command": command}, rules)
+        shown = html.escape(describe("Bash", {"command": command}))
+
+        if decision is Decision.DENY:
+            await message.reply(f"🚫 Заблокировано правилом:\n<code>{shown}</code>", parse_mode="HTML")
+            return
+
+        if decision is Decision.ASK:
+            broker = brokers.get(thread_id)
+            if broker is None:
+                await message.reply("Нет брокера подтверждений для этого топика.")
+                return
+            if not await broker.request(uuid.uuid4().hex, describe("Bash", {"command": command})):
+                await message.reply("Отклонено.")
+                return
+
+        sessions.mark_busy(thread_id, True)
+        try:
+            code, output = await run_shell(command, cwd=row.cwd)
+        except Exception as exc:
+            log.exception("shell failed in thread %s", thread_id)
+            await message.reply(f"❌ {type(exc).__name__}: {exc}"[:600])
+            return
+        finally:
+            sessions.mark_busy(thread_id, False)
+
+        head = "✅" if code == 0 else f"❌ exit {code}"
+        await message.reply(f"{head} <code>{shown}</code>", parse_mode="HTML")
+        for part in chunks(output):
+            await message.answer(f"<pre>{html.escape(part)}</pre>", parse_mode="HTML")
 
     @dp.message(F.text)
     async def on_prompt(message: Message) -> None:
