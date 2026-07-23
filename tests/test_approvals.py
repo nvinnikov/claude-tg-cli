@@ -145,3 +145,20 @@ def _ctx():
     from claude_agent_sdk.types import ToolPermissionContext
 
     return ToolPermissionContext(signal=None, suggestions=[], tool_use_id="tu_1")
+
+
+async def test_colliding_key_denies_second_and_preserves_first():
+    async def ask(key: str, description: str) -> None:
+        pass
+
+    broker = ApprovalBroker(ask=ask, timeout_s=5)
+    first = asyncio.create_task(broker.request("X", "call A"))
+    await asyncio.sleep(0)
+
+    # второй запрос с тем же ключом отклоняется немедленно и не затирает первый
+    assert await broker.request("X", "call B") is False
+    assert broker.pending() == ["X"]
+
+    broker.resolve("X", True)
+    assert await first is True
+    assert broker.pending() == []

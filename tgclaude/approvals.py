@@ -23,16 +23,22 @@ class ApprovalBroker:
         self._waiters: dict[str, asyncio.Future[bool]] = {}
 
     async def request(self, key: str, description: str) -> bool:
+        # Коллизия ключа сделала бы resolve() неоднозначным — отклоняем (fail-closed).
+        existing = self._waiters.get(key)
+        if existing is not None and not existing.done():
+            return False
         loop = asyncio.get_running_loop()
         fut: asyncio.Future[bool] = loop.create_future()
         self._waiters[key] = fut
         try:
             await self._ask(key, description)
             return await asyncio.wait_for(fut, timeout=self._timeout_s)
-        except (TimeoutError, asyncio.TimeoutError):
+        except TimeoutError:
             return False
         finally:
-            self._waiters.pop(key, None)
+            # Удаляем только свою запись — чужую (при коллизии) не трогаем.
+            if self._waiters.get(key) is fut:
+                del self._waiters[key]
 
     def resolve(self, key: str, approved: bool) -> None:
         fut = self._waiters.get(key)
