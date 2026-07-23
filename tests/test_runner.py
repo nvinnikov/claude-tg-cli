@@ -1,3 +1,5 @@
+import pytest
+
 from claude_agent_sdk.types import (
     AssistantMessage,
     ResultMessage,
@@ -107,3 +109,32 @@ async def test_stop_is_noop_without_client():
     runner = Runner(cwd="/tmp", session_id=None, can_use_tool=None)
 
     await runner.stop()  # клиента ещё нет — не должно падать
+
+
+async def test_run_drops_client_after_failure():
+    """Сбой не должен навсегда ломать сессию: клиент сбрасывается,
+    следующий прогон подключается заново (иначе — вечный 'Not connected')."""
+
+    class FailingClient:
+        def __init__(self) -> None:
+            self.disconnected = False
+
+        async def query(self, prompt: str, session_id: str = "default") -> None:
+            raise RuntimeError("boom")
+
+        def receive_response(self):  # pragma: no cover - до него не доходит
+            raise AssertionError("не должно вызываться")
+
+        async def disconnect(self) -> None:
+            self.disconnected = True
+
+    runner = Runner(cwd="/tmp", session_id=None, can_use_tool=None)
+    client = FailingClient()
+    runner._client = client
+
+    with pytest.raises(RuntimeError):
+        async for _ in runner.run("hi"):
+            pass
+
+    assert runner._client is None
+    assert client.disconnected is True

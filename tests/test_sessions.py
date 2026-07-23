@@ -101,3 +101,15 @@ def test_interrupted_flag_roundtrip(manager):
 
     manager.clear_interrupted(1)
     assert manager.was_interrupted(1) is False
+
+
+async def test_set_cwd_clears_session(manager, tmp_path):
+    """Сессии CLI привязаны к каталогу — возобновлять старую в новом cwd нельзя."""
+    manager.get_or_create(1)
+    manager.remember_session(1, "sess-old")
+    target = tmp_path / "other"
+    target.mkdir()
+
+    await manager.set_cwd(1, str(target))
+
+    assert manager.get_or_create(1).session_id is None

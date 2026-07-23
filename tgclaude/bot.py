@@ -170,6 +170,7 @@ async def main() -> None:
         steps: list[str] = []
         texts: list[str] = []
         status = "ok"
+        failure = ""
 
         progress = await message.reply(progress_text(steps))
         last_edit = 0.0
@@ -198,9 +199,12 @@ async def main() -> None:
                         status = "error"
                     if event.result:
                         texts.append(event.result)
-        except Exception:
+        except Exception as exc:
             log.exception("run failed in thread %s", thread_id)
             status = "error"
+            # Показываем причину в чат: иначе видно только "ошибка" без деталей,
+            # а логи с телефона не посмотришь.
+            failure = f"{type(exc).__name__}: {exc}"[:600]
         finally:
             sessions.mark_busy(thread_id, False)
 
@@ -212,7 +216,12 @@ async def main() -> None:
             progress_text(steps, finished=True, elapsed_s=elapsed, status=status)
         )
 
-        answer = texts[-1] if texts else "(пустой ответ)"
+        if texts:
+            answer = texts[-1]
+        elif failure:
+            answer = f"{failure}\n\nЕсли повторяется — /new (сброс сессии)."
+        else:
+            answer = "(пустой ответ)"
         for part in chunks(to_html(answer)):
             await message.answer(part, parse_mode="HTML")
 

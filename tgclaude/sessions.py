@@ -42,6 +42,9 @@ class SessionManager:
 
         self.store.ensure(thread_id, str(self.config.default_cwd))
         self.store.set_cwd(thread_id, str(target))
+        # Сессии CLI привязаны к проектному каталогу: возобновить сессию из
+        # старого cwd в новом нельзя (ProcessError). Смена каталога = новая сессия.
+        self.store.clear_session(thread_id)
         return str(target)
 
     def is_busy(self, thread_id: int) -> bool:

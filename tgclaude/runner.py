@@ -77,10 +77,26 @@ class Runner:
 
     async def run(self, prompt: str) -> AsyncIterator[Event]:
         client = await self._ensure_client()
-        await client.query(prompt)
-        async for message in client.receive_response():
-            for event in translate(message):
-                yield event
+        try:
+            await client.query(prompt)
+            async for message in client.receive_response():
+                for event in translate(message):
+                    yield event
+        except Exception:
+            # После сбоя клиент остаётся нерабочим, и все следующие прогоны
+            # падали бы с "Not connected". Сбрасываем — следующий вызов
+            # подключится заново. Ловим Exception, а не BaseException, чтобы
+            # не трогать клиент при отмене задачи или закрытии генератора.
+            await self._drop_client()
+            raise
+
+    async def _drop_client(self) -> None:
+        client, self._client = self._client, None
+        if client is not None:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass  # клиент уже мёртв — важно лишь снять кэш
 
     async def stop(self) -> None:
         """Только сигналит interrupt. Дренаж делает единственный потребитель — цикл run(),
