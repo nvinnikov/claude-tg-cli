@@ -16,7 +16,9 @@ Telegram-бот, который выполняет задачи на этой м
 
 Вручную: `uv run python -m tgclaude.bot`
 
-Автозапуск:
+Автозапуск. Сначала подставь в `launchd/com.nvinnikov.tg-claude.plist` свои пути
+вместо `/Users/YOUR_USERNAME/tg-claude` (`WorkingDirectory` и пути логов), при
+необходимости поправь путь к `uv` (`which uv`). Затем:
 
 ```bash
 ln -sf "$PWD/launchd/com.nvinnikov.tg-claude.plist" ~/Library/LaunchAgents/

@@ -13,14 +13,14 @@
         <string>tgclaude.bot</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/nvinnikov/Documents/Flybo/tg-claude</string>
+    <string>/Users/YOUR_USERNAME/tg-claude</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/nvinnikov/Documents/Flybo/tg-claude/tg-claude.log</string>
+    <string>/Users/YOUR_USERNAME/tg-claude/tg-claude.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/nvinnikov/Documents/Flybo/tg-claude/tg-claude.log</string>
+    <string>/Users/YOUR_USERNAME/tg-claude/tg-claude.log</string>
 </dict>
 </plist>

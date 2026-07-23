@@ -6,3 +6,4 @@ config.toml
 *.log
 *.egg-info/
 .pytest_cache/
+.superpowers/
