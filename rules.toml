@@ -12,11 +12,11 @@ allow = [
 
 # Запрещено всегда. Проверяется первым, кнопкой не обходится.
 deny = [
-  "rm\\s+(-[a-zA-Z]*\\s+)*-?[a-zA-Z]*[rf]",
+  "\\brm\\b.*(-[a-zA-Z]*[rRfF]|--recursive|--force|--no-preserve-root)",
   "\\bdd\\s+if=",
   ":\\(\\)\\s*\\{",
   "\\bmkfs\\b",
-  "--context[= ]prod",
-  "\\bgit\\s+push\\b.*--force",
+  "--context[=\\s]+prod",
+  "\\bgit\\s+push\\b.*(--force|-f\\b)",
   "\\bshutdown\\b|\\breboot\\b",
 ]

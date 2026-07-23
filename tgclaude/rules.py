@@ -8,6 +8,12 @@ READ_ONLY_TOOLS = frozenset({"Read", "Grep", "Glob", "NotebookRead", "TodoWrite"
 FILE_TOOLS = frozenset({"Write", "Edit", "NotebookEdit"})
 _MAX_DESCRIBE = 128
 
+# Метасимволы шелла, позволяющие сцепить/подставить/перенаправить команды
+# (chaining, substitution, redirection). Наличие любого из них в команде
+# должно требовать подтверждения, даже если префикс команды в whitelist —
+# иначе whitelist-префикс авторизует произвольный "хвост".
+_SHELL_METACHARS = re.compile(r"[;&|`$(){}<>\n\r]")
+
 
 class Decision(enum.Enum):
     ALLOW = "allow"
@@ -26,7 +32,8 @@ def load_rules(path: Path) -> Rules:
         raw = tomllib.load(fh)
     return Rules(
         allow=tuple(re.compile(p) for p in raw.get("allow", [])),
-        deny=tuple(re.compile(p) for p in raw.get("deny", [])),
+        # re.DOTALL — чтобы "--force" на второй строке не спрятался от deny-паттерна
+        deny=tuple(re.compile(p, re.DOTALL) for p in raw.get("deny", [])),
     )
 
 
@@ -49,10 +56,12 @@ def decide(tool_name: str, input_data: dict, rules: Rules) -> Decision:
     """Deny-лист → whitelist → запрос подтверждения."""
     if tool_name == "Bash":
         command = input_data.get("command")
-        if not command:
+        if not isinstance(command, str) or not command:
             return Decision.DENY
         if any(p.search(command) for p in rules.deny):
             return Decision.DENY
+        if _SHELL_METACHARS.search(command):
+            return Decision.ASK
         if any(p.search(command) for p in rules.allow):
             return Decision.ALLOW
         return Decision.ASK
