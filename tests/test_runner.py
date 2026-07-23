@@ -5,7 +5,7 @@ from claude_agent_sdk.types import (
     ToolUseBlock,
 )
 
-from tgclaude.runner import DoneEvent, TextEvent, ToolEvent, translate
+from tgclaude.runner import DoneEvent, Runner, TextEvent, ToolEvent, translate
 
 
 def test_translate_tool_use_block():
@@ -82,3 +82,28 @@ def test_translate_ignores_empty_text():
     msg = AssistantMessage(content=[TextBlock(text="   ")], model="claude-opus-4-8")
 
     assert translate(msg) == []
+
+
+async def test_stop_only_interrupts_without_draining():
+    class FakeClient:
+        def __init__(self) -> None:
+            self.interrupted = False
+
+        async def interrupt(self) -> None:
+            self.interrupted = True
+
+        def receive_response(self):
+            raise AssertionError("stop() не должен читать receive_response()")
+
+    runner = Runner(cwd="/tmp", session_id=None, can_use_tool=None)
+    runner._client = FakeClient()
+
+    await runner.stop()
+
+    assert runner._client.interrupted is True
+
+
+async def test_stop_is_noop_without_client():
+    runner = Runner(cwd="/tmp", session_id=None, can_use_tool=None)
+
+    await runner.stop()  # клиента ещё нет — не должно падать

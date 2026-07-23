@@ -83,13 +83,11 @@ class Runner:
                 yield event
 
     async def stop(self) -> None:
-        """Прерывает текущий прогон и вычищает буфер — иначе хвост попадёт в следующий."""
-        if self._client is None:
-            return
-        await self._client.interrupt()
-        async for message in self._client.receive_response():
-            if isinstance(message, ResultMessage):
-                break
+        """Только сигналит interrupt. Дренаж делает единственный потребитель — цикл run(),
+        который получит терминальный ResultMessage и сам завершится. Второй потребитель
+        receive_response() здесь привёл бы к гонке за один поток сообщений."""
+        if self._client is not None:
+            await self._client.interrupt()
 
     async def close(self) -> None:
         if self._client is not None:
