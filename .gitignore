@@ -4,3 +4,5 @@ __pycache__/
 config.toml
 *.db
 *.log
+*.egg-info/
+.pytest_cache/
