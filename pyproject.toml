@@ -1,0 +1,21 @@
+[project]
+name = "tg-claude"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "claude-agent-sdk>=0.2.126",
+    "aiogram>=3.15",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["tgclaude*"]

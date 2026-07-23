@@ -1,0 +1,6 @@
+bot_token = "123456:REPLACE_ME"
+allowed_user_id = 0
+chat_id = 0
+default_cwd = "/Users/nvinnikov/Documents/Flybo"
+approval_timeout_s = 300
+db_path = "sessions.db"
