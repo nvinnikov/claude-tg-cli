@@ -29,6 +29,7 @@ def progress_text(
 
 def to_html(text: str) -> str:
     """Markdown → подмножество HTML, которое понимает Telegram."""
+    text = text.replace("\x00", "")
     placeholders: list[str] = []
 
     def stash(rendered: str) -> str:
@@ -56,7 +57,9 @@ def chunks(text: str, limit: int = 3800) -> list[str]:
         if cut <= 0:
             cut = limit
         parts.append(rest[:cut])
-        rest = rest[cut:].lstrip("\n")
+        rest = rest[cut:]
+        if rest.startswith("\n"):
+            rest = rest[1:]
     if rest:
         parts.append(rest)
     return parts
